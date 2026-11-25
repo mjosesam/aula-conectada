@@ -384,6 +384,7 @@ def main():
     args = parser.parse_args()
     requisitos = cargar_requisitos(args.requisitos)
     resultado = {"fecha": datetime.now(timezone.utc).isoformat(), "sistema_operativo": platform.system(),
+                 # Contrato ART-02 1.0 validado (normal, A-01 y rechazo enum)
                  "version_herramienta": "0.4-c03", "dns": args.dns, "proxy": args.proxy,
                  "requisitos": args.requisitos.name, "comprobaciones": comprobar(requisitos, args)}
     # TU TAREA: generar ART-03 (HTML) y ART-04 (texto y CSV), coherentes con este JSON.
@@ -404,3 +405,4 @@ if __name__ == "__main__":
     except (OSError, ValueError) as exc:
         print(f"Parece que falta un paso: {exc}")
         sys.exit(1)
+
