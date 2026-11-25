@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 import json
 from pathlib import Path
 import platform
+import socket
 import sys
 import time
 
@@ -119,11 +120,94 @@ def comprobar_dns(requisitos, dns_arg):
     return resultado_c01, direcciones
 
 
+def comprobar_puertos(requisitos, direcciones):
+    inicio_total = time.perf_counter()
+    dominios_req = requisitos.get("dominios", [])
+    evidencias = []
+    puertos_fallidos = []
+    no_comprobados = []
+
+    for item in dominios_req:
+        if not isinstance(item, dict) or "nombre" not in item:
+            continue
+        dominio = item["nombre"]
+        puertos = item.get("puertos", [])
+
+        if dominio not in direcciones:
+            lista_puertos = ", ".join(str(p.get("puerto")) for p in puertos if isinstance(p, dict) and "puerto" in p)
+            no_comprobados.append(f"{dominio} (puertos {lista_puertos})")
+            evidencias.append(
+                f"{dominio} (puertos {lista_puertos}) -> no comprobado por falta de dirección resuelta en C-01"
+            )
+            continue
+
+        ip = direcciones[dominio]
+        for entrada_puerto in puertos:
+            if not isinstance(entrada_puerto, dict) or "puerto" not in entrada_puerto:
+                continue
+            puerto = int(entrada_puerto["puerto"])
+            protocolo = str(entrada_puerto.get("protocolo", "TCP")).upper()
+            t0 = time.perf_counter()
+            try:
+                with socket.create_connection((ip, puerto), timeout=3.0):
+                    ms = round((time.perf_counter() - t0) * 1000, 1)
+                    evidencias.append(f"{dominio} ({ip}:{puerto}/{protocolo}) -> abierto (superada: {ms} ms)")
+            except ConnectionRefusedError:
+                ms = round((time.perf_counter() - t0) * 1000, 1)
+                puertos_fallidos.append(f"{dominio} ({ip}:{puerto}/{protocolo}) rechazó la conexión")
+                evidencias.append(
+                    f"{dominio} ({ip}:{puerto}/{protocolo}) -> conexión rechazada / puerto cerrado (fallida: {ms} ms)"
+                )
+            except (TimeoutError, socket.timeout):
+                ms = round((time.perf_counter() - t0) * 1000, 1)
+                puertos_fallidos.append(f"{dominio} ({ip}:{puerto}/{protocolo}) agotó el tiempo límite de 3 s")
+                evidencias.append(
+                    f"{dominio} ({ip}:{puerto}/{protocolo}) -> tiempo agotado tras 3.0 s (fallida: {ms} ms)"
+                )
+            except OSError as exc:
+                ms = round((time.perf_counter() - t0) * 1000, 1)
+                puertos_fallidos.append(f"{dominio} ({ip}:{puerto}/{protocolo}) error de red ({exc})")
+                evidencias.append(
+                    f"{dominio} ({ip}:{puerto}/{protocolo}) -> error de conexión ({exc}) (fallida: {ms} ms)"
+                )
+
+    duracion_ms = round((time.perf_counter() - inicio_total) * 1000, 1)
+
+    if puertos_fallidos:
+        estado = "fallida"
+        siguiente_paso = (
+            "Revisa que el servicio esté escuchando y que el cortafuegos permita tráfico TCP en: "
+            + "; ".join(puertos_fallidos) + "."
+        )
+    elif not evidencias or all("no comprobado" in e for e in evidencias):
+        estado = "no_comprobada"
+        siguiente_paso = "Resuelve primero C-01 (Resolución DNS) para obtener las direcciones IP antes de probar puertos."
+    elif no_comprobados:
+        estado = "superada"
+        siguiente_paso = (
+            "Los puertos con IP conocida están abiertos, pero quedaron sin comprobar por falta de resolución DNS en C-01: "
+            + ", ".join(no_comprobados) + "."
+        )
+    else:
+        estado = "superada"
+        siguiente_paso = "Continuar con C-03 (HTTPS y certificado) sobre los puertos abiertos."
+
+    return {
+        "id": "C-02",
+        "nombre": NOMBRES[1],
+        "estado": estado,
+        "evidencia": "; ".join(evidencias),
+        "siguiente_paso": siguiente_paso,
+        "duracion_ms": duracion_ms,
+    }
+
+
 def comprobar(requisitos, args):
     resultado_c01, direcciones = comprobar_dns(requisitos, args.dns)
-    resultados = [resultado_c01]
-    for numero, nombre in enumerate(NOMBRES[1:], 2):
-        # TU TAREA: implementar C-02 a C-08 con evidencia real y tiempo medido.
+    resultado_c02 = comprobar_puertos(requisitos, direcciones)
+    resultados = [resultado_c01, resultado_c02]
+    for numero, nombre in enumerate(NOMBRES[2:], 3):
+        # TU TAREA: implementar C-03 a C-08 con evidencia real y tiempo medido.
         # Usa direcciones (de C-01), args.proxy y args.ca sin modificar la configuración del equipo.
         # Mantén el nombre TLS al conectar a la dirección obtenida del DNS de pruebas.
         # Si una comprobación anterior te impide continuar, explica por qué.
@@ -144,7 +228,7 @@ def main():
     args = parser.parse_args()
     requisitos = cargar_requisitos(args.requisitos)
     resultado = {"fecha": datetime.now(timezone.utc).isoformat(), "sistema_operativo": platform.system(),
-                 "version_herramienta": "0.2-c01", "dns": args.dns, "proxy": args.proxy,
+                 "version_herramienta": "0.3-c02", "dns": args.dns, "proxy": args.proxy,
                  "requisitos": args.requisitos.name, "comprobaciones": comprobar(requisitos, args)}
     # TU TAREA: generar ART-03 (HTML) y ART-04 (texto y CSV), coherentes con este JSON.
     # TU TAREA: --ia añade una explicación opcional; sin clave o red, usa reglas.
@@ -152,7 +236,8 @@ def main():
     args.salida.parent.mkdir(parents=True, exist_ok=True)
     args.salida.write_text(json.dumps(resultado, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     c01 = resultado["comprobaciones"][0]
-    print(f"Resultado guardado en {args.salida}. C-01 ({c01['nombre']}): {c01['estado']} ({c01['duracion_ms']} ms).")
+    c02 = resultado["comprobaciones"][1]
+    print(f"Resultado guardado en {args.salida}. C-01: {c01['estado']} | C-02: {c02['estado']} ({c02['duracion_ms']} ms).")
     return 0
 
 
@@ -162,3 +247,4 @@ if __name__ == "__main__":
     except (OSError, ValueError) as exc:
         print(f"Parece que falta un paso: {exc}")
         sys.exit(1)
+
