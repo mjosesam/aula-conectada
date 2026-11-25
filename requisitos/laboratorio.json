@@ -1,0 +1,54 @@
+{
+  "version": "1.0",
+  "dominios": [
+    {
+      "nombre": "plataforma.ejemplo.edu",
+      "uso": "plataforma",
+      "puertos": [
+        {
+          "puerto": 8443,
+          "protocolo": "TCP"
+        }
+      ]
+    },
+    {
+      "nombre": "contenidos.ejemplo.edu",
+      "uso": "contenidos",
+      "puertos": [
+        {
+          "puerto": 8446,
+          "protocolo": "TCP"
+        }
+      ]
+    },
+    {
+      "nombre": "tiempo-real.ejemplo.edu",
+      "uso": "tiempo real",
+      "puertos": [
+        {
+          "puerto": 8443,
+          "protocolo": "TCP"
+        }
+      ]
+    }
+  ],
+  "huellas": {
+    "plataforma.ejemplo.edu": "7ebd14d831786529057e353aa9bedff00bce6c0b52b57259f80d87ffcb41b52a",
+    "contenidos.ejemplo.edu": "7ebd14d831786529057e353aa9bedff00bce6c0b52b57259f80d87ffcb41b52a",
+    "tiempo-real.ejemplo.edu": "7ebd14d831786529057e353aa9bedff00bce6c0b52b57259f80d87ffcb41b52a"
+  },
+  "descarga": {
+    "url": "https://contenidos.ejemplo.edu:8446/contenidos/escena-prueba.bin",
+    "mb": 48,
+    "mbps_minimos": 10
+  },
+  "latencia": {
+    "ms_maximos": 500,
+    "muestras": 5
+  },
+  "tiempo_real": {
+    "url": "wss://tiempo-real.ejemplo.edu:8443/tiempo-real",
+    "segundos": 35
+  },
+  "notas": "Solo laboratorio local. Edición común ACN-2026-10-R3. 48 MB decimales. Confianza por fichero."
+}

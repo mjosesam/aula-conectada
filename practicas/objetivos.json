@@ -1,0 +1,16 @@
+﻿{
+  "servicios": [
+    {
+      "nombre": "plataforma.ejemplo.edu",
+      "puertos": [8443]
+    },
+    {
+      "nombre": "contenidos.ejemplo.edu",
+      "puertos": [8443]
+    },
+    {
+      "nombre": "tiempo-real.ejemplo.edu",
+      "puertos": [8443, 8446]
+    }
+  ]
+}
